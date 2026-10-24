@@ -1,0 +1,1 @@
+S22: Supabase sifresi Android secure storage ile korunur; 409 basari sayilmaz; Kasa, gunluk satis, urun ve satis sayaclari bagimsiz olarak periyodik yenilenir. PC SQL koduna dokunulmadi. Flutter SDK bu ortamda yok, Codemagic build ve cihaz testi gereklidir. Ilk acilista Supabase sifresini bir kez yeniden girip Bulut Veri Girisini Test Et butonuna basin.
