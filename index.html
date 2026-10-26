@@ -17,8 +17,8 @@
 <section class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>Ürün görselleri</h2><button class="secondary" id="logout">Oturumu kapat</button></div>
 <div class="stats"><div class="stat"><span>Toplam ürün</span><b id="total">0</b></div><div class="stat"><span>Yüklenen</span><b id="loaded">0</b></div><div class="stat"><span>Eksik</span><b id="missing">0</b></div><div class="stat"><span>Taranan</span><b id="scanned">0</b></div></div>
 <div class="bar"><div id="progress"></div></div><p id="status" class="muted">Hazır.</p>
-<div class="actions"><button id="start">İnternetten bul ve Supabase'e yükle</button><button id="stop" class="secondary" disabled>Durdur</button><button id="refresh" class="ghost">Görselleri yenile</button></div>
-<p class="muted">Otomatik arama barkodla Open Food Facts kataloğunu kontrol eder. Gerçek eşleşme bulunmayan ürünlere yanlış görsel yüklenmez. Diğer kaynaklar için ürün kartındaki web aramasını kullan.</p>
+<div class="actions"><button id="start" disabled>Otomatik arama geçici olarak kapalı</button><button id="stop" class="secondary" disabled>Durdur</button><button id="refresh" class="ghost">Görselleri yenile</button></div>
+<p class="muted">Kalitesiz ve yanlış ürün fotoğraflarını önlemek için otomatik arama durduruldu. Yalnızca ambalajı açıkça görünen doğru ürün fotoğraflarını manuel yükleyin.</p>
 </section>
 <section class="panel"><div class="tools"><input id="search" placeholder="Ürün adı, kodu veya barkodu ara"><select id="filter"><option value="all">Tüm ürünler</option><option value="missing">Fotoğrafı eksik</option><option value="loaded">Fotoğrafı olanlar</option></select></div><p id="shown" class="muted"></p><div class="grid" id="products"></div></section>
 <section class="panel"><h2>İşlem kaydı</h2><div id="log">Hazır.</div></section>
@@ -103,7 +103,7 @@ $('loginBtn').onclick=async()=>{
  }catch(e){$('loginMessage').textContent='Bağlantı hatası: '+e.message}
  finally{$('loginBtn').disabled=false}
 };
-$('start').onclick=async()=>{
+$('start').onclick=async()=>{return;
  if(running)return;
  running=true;$('start').disabled=true;$('stop').disabled=false;scanned=0;
  try{
