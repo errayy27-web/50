@@ -17,8 +17,8 @@
 <section class="panel"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h2>Ürün görselleri</h2><button class="secondary" id="logout">Oturumu kapat</button></div>
 <div class="stats"><div class="stat"><span>Toplam ürün</span><b id="total">0</b></div><div class="stat"><span>Yüklenen</span><b id="loaded">0</b></div><div class="stat"><span>Eksik</span><b id="missing">0</b></div><div class="stat"><span>Taranan</span><b id="scanned">0</b></div></div>
 <div class="bar"><div id="progress"></div></div><p id="status" class="muted">Hazır.</p>
-<div class="actions"><button id="start" disabled>Otomatik arama (API gerekli)</button><button id="stop" class="secondary" disabled>Durdur</button><button id="refresh" class="ghost">Görselleri yenile</button></div>
-<p class="muted">Önce barkod ve orijinal ambalaj aranır. İngilizce ürün araması ve referans fotoğraf yükleme seçenekleri her ürünün altındadır. Otomatik internet araması ve yapay zekâ üretimi için sunucu API anahtarları gerekir; anahtarları bu sayfaya yazmayın.</p>
+<div class="actions"><button id="start">API durumunu kontrol et</button><button id="stop" class="secondary" disabled>Durdur</button><button id="refresh" class="ghost">Görselleri yenile</button></div>
+<p class="muted">Önce barkod ve orijinal ambalaj aranır. İngilizce ürün araması ve referans fotoğraf yükleme seçenekleri her ürünün altındadır. İnternet araması ve yapay zekâ üretimi için API anahtarları Supabase Edge Function Secrets bölümünde tutulur.</p>
 </section>
 <section class="panel"><div class="tools"><input id="search" placeholder="Ürün adı, kodu veya barkodu ara"><select id="filter"><option value="all">Tüm ürünler</option><option value="missing">Fotoğrafı eksik</option><option value="loaded">Fotoğrafı olanlar</option></select></div><p id="shown" class="muted"></p><div class="grid" id="products"></div></section>
 <section class="panel"><h2>İşlem kaydı</h2><div id="log">Hazır.</div></section>
@@ -70,7 +70,7 @@ function render(){
  $('products').innerHTML=items.slice(0,300).map(p=>{
   const id=String(p.id),row=images.get(id),barcodes=Array.isArray(p.barcodes)?p.barcodes:[];
   const barcode=barcodes[0]||'',query=encodeURIComponent((barcode?barcode+' ':'')+String(p.name||'')+' ürün fotoğrafı'),enquery=encodeURIComponent(String(p.name||'')+' '+(barcode||'')+' official product packshot white background');
-  return '<article class="product"><div class="thumb">'+(row?'<img loading="lazy" src="'+escapeHtml(imgUrl(row.image_path))+'" alt="Ürün görseli">':'<span>▧</span>')+'</div><div class="body"><b>'+escapeHtml(p.name)+'</b><div class="code">ID: '+escapeHtml(id)+'<br>Barkod: '+escapeHtml(barcode)+'</div><span class="pill">'+(row?escapeHtml(row.source):'Görsel yok')+'</span><div class="actions"><label class="linkbtn upload">Fotoğraf yükle<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="'+escapeHtml(id)+'"></label><a class="linkbtn secondary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=isch&q='+query+'">Webde ara</a><a class="linkbtn secondary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=isch&q='+enquery+'">İngilizce ara</a></div></div></article>';
+  return '<article class="product"><div class="thumb">'+(row?'<img loading="lazy" src="'+escapeHtml(imgUrl(row.image_path))+'" alt="Ürün görseli">':'<span>▧</span>')+'</div><div class="body"><b>'+escapeHtml(p.name)+'</b><div class="code">ID: '+escapeHtml(id)+'<br>Barkod: '+escapeHtml(barcode)+'</div><span class="pill">'+(row?escapeHtml(row.source):'Görsel yok')+'</span><div class="actions"><label class="linkbtn upload">Fotoğraf yükle<input type="file" accept="image/png,image/jpeg,image/webp" data-upload="'+escapeHtml(id)+'"></label><a class="linkbtn secondary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=isch&q='+query+'">Webde ara</a><a class="linkbtn secondary" target="_blank" rel="noopener noreferrer" href="https://www.google.com/search?tbm=isch&q='+enquery+'">İngilizce ara</a><button type="button" class="secondary" data-find="'+escapeHtml(id)+'">Görsel adaylarını bul</button><label class="linkbtn upload">AI ile düzenle<input type="file" accept="image/png,image/jpeg,image/webp" data-ai="'+escapeHtml(id)+'"></label></div></div></article>';
  }).join('');
  if(items.length>300)$('shown').textContent+=' · İlk 300 sonuç listeleniyor, arama ile daralt.';
 }
@@ -103,26 +103,9 @@ $('loginBtn').onclick=async()=>{
  }catch(e){$('loginMessage').textContent='Bağlantı hatası: '+e.message}
  finally{$('loginBtn').disabled=false}
 };
-$('start').onclick=async()=>{return;
- if(running)return;
- running=true;$('start').disabled=true;$('stop').disabled=false;scanned=0;
- try{
-  const batch=10;
-  for(let offset=0;offset<catalog.length&&running;offset+=batch){
-   let result;
-   try{result=await request('/functions/v1/match-product-images',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({offset,limit:batch})})}
-   catch(e){setStatus('İşlem durdu: '+e.message);break}
-   scanned=Math.min(catalog.length,Number(result.next_offset)||offset+batch);
-   const counts={};for(const item of result.results||[])counts[item.status]=(counts[item.status]||0)+1;
-   setStatus(scanned+'/'+catalog.length+' tarandı · '+Object.entries(counts).map(([k,v])=>k+': '+v).join(', '));
-   stats();
-   if(scanned%50===0||scanned>=catalog.length)await getImages();
-   if((result.results||[]).length===0)break;
-  }
-  await getImages();setStatus(running?'Tarama tamamlandı. Bulunamayanlar eksik listesinde.':'Tarama durduruldu.');
- }catch(e){setStatus('Hata: '+e.message)}
- finally{running=false;$('start').disabled=false;$('stop').disabled=true}
-};
+$('start').onclick=async()=>{try{const r=await request('/functions/v1/product-image-tools',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'status'})});setStatus('İnternet görsel arama: '+(r.search_ready?'HAZIR':'BRAVE_SEARCH_API_KEY gerekli')+' · Yapay zekâ: '+(r.ai_ready?'HAZIR':'OPENAI_API_KEY gerekli'));}catch(e){setStatus('API kontrol hatası: '+e.message)}};
+$('products').addEventListener('click',async e=>{const btn=e.target.closest('[data-find]');if(!btn)return;btn.disabled=true;try{const r=await request('/functions/v1/product-image-tools',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({action:'search',product_id:btn.dataset.find})});const names=(r.candidates||[]).slice(0,8).map((x,i)=>(i+1)+'. '+x.title+'\\n'+x.page).join('\\n\\n');alert(names||'Uygun görsel adayı bulunamadı');setStatus((r.candidates||[]).length+' görsel adayı bulundu.');}catch(e){setStatus('Arama: '+e.message)}finally{btn.disabled=false}});
+$('products').addEventListener('change',async e=>{const t=e.target;if(!t.matches('[data-ai]'))return;const file=t.files?.[0];if(!file)return;const id=t.dataset.ai;const form=new FormData();form.append('action','generate');form.append('product_id',id);form.append('file',file);try{setStatus('AI görsel hazırlanıyor: '+id);await request('/functions/v1/product-image-tools',{method:'POST',body:form});await getImages();setStatus('Görsel oluşturuldu ve Supabase\'e kaydedildi: '+id)}catch(err){setStatus('AI işlemi: '+err.message)}});
 $('stop').onclick=()=>{running=false;$('stop').disabled=true;setStatus('Mevcut grup bitince duracak.')};
 $('refresh').onclick=async()=>{try{await getImages();setStatus('Görseller güncellendi.')}catch(e){setStatus('Hata: '+e.message)}};
 $('logout').onclick=()=>{access='';images.clear();catalog=[];$('app').style.display='none';$('login').classList.remove('hidden');$('connection').textContent='Bağlantı bekleniyor'};
